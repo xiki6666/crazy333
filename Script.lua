@@ -8,6 +8,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 -- Создаем основной интерфейс
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "SheriffTeleportGUI"
+screenGui.ResetOnSpawn = false -- Важно: отключаем сброс при возрождении
 screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
