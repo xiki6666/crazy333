@@ -151,7 +151,7 @@ end
 -- Функция для создания кнопки игрока с аватаром
 local function createPlayerButton(sheriff)
 	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, 0, 0, 60)
+	button.Size = UDim2.new(1, 0, 0, 70) -- Увеличили высоту для отображения двух имен
 	button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 	button.Text = ""
 	button.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -185,23 +185,36 @@ local function createPlayerButton(sheriff)
 	avatarCorner.CornerRadius = UDim.new(0, 20)
 	avatarCorner.Parent = avatar
 
-	-- Имя игрока
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.new(1, -60, 0, 20)
-	nameLabel.Position = UDim2.new(0, 60, 0, 10)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-	nameLabel.Text = sheriff.Name
-	nameLabel.Font = Enum.Font.GothamBold
-	nameLabel.TextSize = 12
-	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.Name = "NameLabel"
-	nameLabel.Parent = buttonContent
+	-- Display Name (видимое имя)
+	local displayNameLabel = Instance.new("TextLabel")
+	displayNameLabel.Size = UDim2.new(1, -60, 0, 18)
+	displayNameLabel.Position = UDim2.new(0, 60, 0, 10)
+	displayNameLabel.BackgroundTransparency = 1
+	displayNameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	displayNameLabel.Text = sheriff.DisplayName
+	displayNameLabel.Font = Enum.Font.GothamBold
+	displayNameLabel.TextSize = 12
+	displayNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	displayNameLabel.Name = "DisplayNameLabel"
+	displayNameLabel.Parent = buttonContent
+
+	-- Username (никнейм)
+	local usernameLabel = Instance.new("TextLabel")
+	usernameLabel.Size = UDim2.new(1, -60, 0, 15)
+	usernameLabel.Position = UDim2.new(0, 60, 0, 30)
+	usernameLabel.BackgroundTransparency = 1
+	usernameLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+	usernameLabel.Text = "@" .. sheriff.Name
+	usernameLabel.Font = Enum.Font.Gotham
+	usernameLabel.TextSize = 10
+	usernameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	usernameLabel.Name = "UsernameLabel"
+	usernameLabel.Parent = buttonContent
 
 	-- Статус
 	local statusLabel = Instance.new("TextLabel")
 	statusLabel.Size = UDim2.new(1, -60, 0, 15)
-	statusLabel.Position = UDim2.new(0, 60, 0, 35)
+	statusLabel.Position = UDim2.new(0, 60, 0, 50)
 	statusLabel.BackgroundTransparency = 1
 	statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	statusLabel.Text = "Выберите для телепортации"
