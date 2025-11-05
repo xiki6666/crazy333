@@ -39,10 +39,10 @@ titleCorner.Parent = title
 
 -- Заменяем ScrollingFrame на обычный Frame для контента
 local contentFrame = Instance.new("Frame")
-contentFrame.Size = UDim2.new(1, -10, 1, -90) -- Увеличили отступ снизу для инструкции
+contentFrame.Size = UDim2.new(1, -10, 1, -90)
 contentFrame.Position = UDim2.new(0, 5, 0, 35)
 contentFrame.BackgroundTransparency = 1
-contentFrame.ClipsDescendants = true -- Обрезаем содержимое, если выходит за границы
+contentFrame.ClipsDescendants = true
 contentFrame.Parent = frame
 
 local uiListLayout = Instance.new("UIListLayout")
@@ -141,6 +141,7 @@ local function createPlayerButton(sheriff)
 	local buttonContent = Instance.new("Frame")
 	buttonContent.Size = UDim2.new(1, 0, 1, 0)
 	buttonContent.BackgroundTransparency = 1
+	buttonContent.Name = "ButtonContent"
 	buttonContent.Parent = button
 
 	-- Аватар игрока
@@ -150,6 +151,7 @@ local function createPlayerButton(sheriff)
 	avatar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	avatar.BorderSizePixel = 0
 	avatar.Image = getPlayerAvatar(sheriff.UserId)
+	avatar.Name = "Avatar"
 	avatar.Parent = buttonContent
 
 	local avatarCorner = Instance.new("UICorner")
@@ -166,6 +168,7 @@ local function createPlayerButton(sheriff)
 	nameLabel.Font = Enum.Font.GothamBold
 	nameLabel.TextSize = 12
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nameLabel.Name = "NameLabel"
 	nameLabel.Parent = buttonContent
 
 	-- Статус
@@ -178,6 +181,7 @@ local function createPlayerButton(sheriff)
 	statusLabel.Font = Enum.Font.Gotham
 	statusLabel.TextSize = 10
 	statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+	statusLabel.Name = "StatusLabel"
 	statusLabel.Parent = buttonContent
 
 	button.MouseButton1Click:Connect(function()
@@ -212,10 +216,6 @@ local function createPlayerButton(sheriff)
 			savedPosition = nil
 		end
 	end)
-
-	-- Сохраняем ссылки на элементы для легкого доступа
-	buttonContent.Name = "ButtonContent"
-	statusLabel.Name = "StatusLabel"
 
 	return button
 end
@@ -253,46 +253,43 @@ end
 
 -- Функция обновления списка игроков
 local function updatePlayerList()
+	-- Получаем текущих шерифов
 	local currentSheriffs = {}
-	local currentSheriffIds = {}
-
-	-- Собираем текущих шерифов
+	
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
 		if otherPlayer.Team and otherPlayer.Team.Name:lower() == "sheriffs" and otherPlayer ~= player then
 			table.insert(currentSheriffs, otherPlayer)
-			currentSheriffIds[otherPlayer.UserId] = true
 		end
 	end
-
+	
+	-- Создаем таблицу для отслеживания ID текущих шерифов
+	local currentSheriffIds = {}
+	for _, sheriff in ipairs(currentSheriffs) do
+		currentSheriffIds[sheriff.UserId] = true
+	end
+	
 	-- Удаляем кнопки игроков, которые больше не шерифы
-	local toRemove = {}
 	for userId, button in pairs(activeButtons) do
 		if not currentSheriffIds[userId] then
-			table.insert(toRemove, userId)
-		end
-	end
-
-	for _, userId in ipairs(toRemove) do
-		if activeButtons[userId] then
-			activeButtons[userId]:Destroy()
+			button:Destroy()
 			activeButtons[userId] = nil
-		end
-
-		-- Если удаленный игрок был выбранным шерифом
-		if selectedSheriff and selectedSheriff.UserId == userId then
-			selectedSheriff = nil
-			isTeleported = false
-			savedPosition = nil
+			
+			-- Если удаленный игрок был выбранным шерифом
+			if selectedSheriff and selectedSheriff.UserId == userId then
+				selectedSheriff = nil
+				isTeleported = false
+				savedPosition = nil
+			end
 		end
 	end
-
+	
 	-- Добавляем кнопки для новых шерифов
 	for _, sheriff in ipairs(currentSheriffs) do
 		if not activeButtons[sheriff.UserId] then
 			activeButtons[sheriff.UserId] = createPlayerButton(sheriff)
 		end
 	end
-
+	
 	-- Обновляем заголовок с количеством шерифов
 	title.Text = "ШЕРИФЫ (" .. #currentSheriffs .. ")"
 end
@@ -347,12 +344,15 @@ end
 setupTeamTracking()
 updatePlayerList()
 
--- Постоянное обновление через RunService
+-- Постоянное обновление через RunService (с защитой от частых обновлений)
+local isUpdating = false
 RunService.Heartbeat:Connect(function()
 	lastUpdate = lastUpdate + 1/60
-	if lastUpdate >= updateInterval then
+	if lastUpdate >= updateInterval and not isUpdating then
+		isUpdating = true
 		updatePlayerList()
 		lastUpdate = 0
+		isUpdating = false
 	end
 end)
 
@@ -365,7 +365,7 @@ Players.PlayerAdded:Connect(function(newPlayer)
 end)
 
 Players.PlayerRemoving:Connect(function(leavingPlayer)
-	-- Если игрок выходит, сразу обновляем список
+	-- Если игрок выходит, сразу удаляем его кнопку
 	if activeButtons[leavingPlayer.UserId] then
 		activeButtons[leavingPlayer.UserId]:Destroy()
 		activeButtons[leavingPlayer.UserId] = nil
