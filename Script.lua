@@ -12,7 +12,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 450) -- Увеличили высоту для кнопки обновления
+frame.Size = UDim2.new(0, 300, 0, 450)
 frame.Position = UDim2.new(0, 10, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 frame.BorderSizePixel = 0
@@ -38,7 +38,7 @@ titleCorner.Parent = title
 
 -- Фрейм для списка игроков
 local contentFrame = Instance.new("Frame")
-contentFrame.Size = UDim2.new(1, -10, 1, -140) -- Увеличили отступ для кнопки обновления
+contentFrame.Size = UDim2.new(1, -10, 1, -140)
 contentFrame.Position = UDim2.new(0, 5, 0, 35)
 contentFrame.BackgroundTransparency = 1
 contentFrame.ClipsDescendants = true
@@ -346,11 +346,11 @@ end)
 
 -- Добавляем инструкцию
 local instruction = Instance.new("TextLabel")
-instruction.Size = UDim2.new(1, -10, 0, 50)
+instruction.Size = UDim2.new(1, -10, 0, 40)
 instruction.Position = UDim2.new(0, 5, 1, -40)
 instruction.BackgroundTransparency = 1
 instruction.TextColor3 = Color3.fromRGB(200, 200, 200)
-instruction.Text = "Q - телепортация/возврат\nH - скрыть/показать меню\nНажмите кнопку для обновления списка"
+instruction.Text = "Q - телепортация/возврат\nH - скрыть/показать меню"
 instruction.Font = Enum.Font.Gotham
 instruction.TextSize = 11
 instruction.TextWrapped = true
