@@ -37,19 +37,17 @@ local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 8)
 titleCorner.Parent = title
 
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -10, 1, -40)
-scrollFrame.Position = UDim2.new(0, 5, 0, 35)
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
-scrollFrame.BorderSizePixel = 0
-scrollFrame.BackgroundTransparency = 1
-scrollFrame.ScrollBarThickness = 4
-scrollFrame.Parent = frame
+-- Заменяем ScrollingFrame на обычный Frame для контента
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, -10, 1, -90) -- Увеличили отступ снизу для инструкции
+contentFrame.Position = UDim2.new(0, 5, 0, 35)
+contentFrame.BackgroundTransparency = 1
+contentFrame.ClipsDescendants = true -- Обрезаем содержимое, если выходит за границы
+contentFrame.Parent = frame
 
 local uiListLayout = Instance.new("UIListLayout")
 uiListLayout.Padding = UDim.new(0, 5)
-uiListLayout.Parent = scrollFrame
+uiListLayout.Parent = contentFrame
 
 local activeButtons = {}
 local lastUpdate = 0
@@ -133,17 +131,17 @@ local function createPlayerButton(sheriff)
 	button.Font = Enum.Font.Gotham
 	button.TextSize = 12
 	button.AutoButtonColor = true
-	button.Parent = scrollFrame
+	button.Parent = contentFrame
 
 	local buttonCorner = Instance.new("UICorner")
 	buttonCorner.CornerRadius = UDim.new(0, 6)
 	buttonCorner.Parent = button
 
 	-- Контейнер для содержимого кнопки
-	local contentFrame = Instance.new("Frame")
-	contentFrame.Size = UDim2.new(1, 0, 1, 0)
-	contentFrame.BackgroundTransparency = 1
-	contentFrame.Parent = button
+	local buttonContent = Instance.new("Frame")
+	buttonContent.Size = UDim2.new(1, 0, 1, 0)
+	buttonContent.BackgroundTransparency = 1
+	buttonContent.Parent = button
 
 	-- Аватар игрока
 	local avatar = Instance.new("ImageLabel")
@@ -152,7 +150,7 @@ local function createPlayerButton(sheriff)
 	avatar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	avatar.BorderSizePixel = 0
 	avatar.Image = getPlayerAvatar(sheriff.UserId)
-	avatar.Parent = contentFrame
+	avatar.Parent = buttonContent
 
 	local avatarCorner = Instance.new("UICorner")
 	avatarCorner.CornerRadius = UDim.new(0, 20)
@@ -168,7 +166,7 @@ local function createPlayerButton(sheriff)
 	nameLabel.Font = Enum.Font.GothamBold
 	nameLabel.TextSize = 12
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.Parent = contentFrame
+	nameLabel.Parent = buttonContent
 
 	-- Статус
 	local statusLabel = Instance.new("TextLabel")
@@ -180,17 +178,17 @@ local function createPlayerButton(sheriff)
 	statusLabel.Font = Enum.Font.Gotham
 	statusLabel.TextSize = 10
 	statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-	statusLabel.Parent = contentFrame
+	statusLabel.Parent = buttonContent
 
 	button.MouseButton1Click:Connect(function()
 		-- Снимаем выделение с предыдущего шерифа
 		for userId, btn in pairs(activeButtons) do
 			if userId ~= sheriff.UserId then
 				btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-				local content = btn:FindFirstChildOfClass("Frame")
-				if content then
-					local lbl = content:FindFirstChild("TextLabel")
-					if lbl and lbl.Name == "TextLabel" and lbl ~= nameLabel then
+				local btnContent = btn:FindFirstChild("ButtonContent")
+				if btnContent then
+					local lbl = btnContent:FindFirstChild("StatusLabel")
+					if lbl then
 						lbl.Text = "Выберите для телепортации"
 					end
 				end
@@ -214,6 +212,10 @@ local function createPlayerButton(sheriff)
 			savedPosition = nil
 		end
 	end)
+
+	-- Сохраняем ссылки на элементы для легкого доступа
+	buttonContent.Name = "ButtonContent"
+	statusLabel.Name = "StatusLabel"
 
 	return button
 end
@@ -251,18 +253,18 @@ end
 
 -- Функция обновления списка игроков
 local function updatePlayerList()
-	local sheriffs = {}
+	local currentSheriffs = {}
 	local currentSheriffIds = {}
 
-	-- Ищем всех игроков в команде Sheriffs
+	-- Собираем текущих шерифов
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
 		if otherPlayer.Team and otherPlayer.Team.Name:lower() == "sheriffs" and otherPlayer ~= player then
-			table.insert(sheriffs, otherPlayer)
+			table.insert(currentSheriffs, otherPlayer)
 			currentSheriffIds[otherPlayer.UserId] = true
 		end
 	end
 
-	-- Удаляем кнопки игроков, которые больше не шерифы или вышли
+	-- Удаляем кнопки игроков, которые больше не шерифы
 	local toRemove = {}
 	for userId, button in pairs(activeButtons) do
 		if not currentSheriffIds[userId] then
@@ -284,18 +286,15 @@ local function updatePlayerList()
 		end
 	end
 
-	-- Создаем кнопки для новых шерифов
-	for _, sheriff in ipairs(sheriffs) do
+	-- Добавляем кнопки для новых шерифов
+	for _, sheriff in ipairs(currentSheriffs) do
 		if not activeButtons[sheriff.UserId] then
 			activeButtons[sheriff.UserId] = createPlayerButton(sheriff)
 		end
 	end
 
-	-- Обновляем размер контента
-	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y)
-
 	-- Обновляем заголовок с количеством шерифов
-	title.Text = "ШЕРИФЫ (" .. #sheriffs .. ")"
+	title.Text = "ШЕРИФЫ (" .. #currentSheriffs .. ")"
 end
 
 -- Обработчик нажатия клавиши Q для телепортации
@@ -308,10 +307,10 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		-- Обновляем статус кнопки
 		if selectedSheriff and activeButtons[selectedSheriff.UserId] then
 			local button = activeButtons[selectedSheriff.UserId]
-			local contentFrame = button:FindFirstChildOfClass("Frame")
-			if contentFrame then
-				local statusLabel = contentFrame:FindFirstChild("TextLabel")
-				if statusLabel and statusLabel.Name == "TextLabel" then
+			local buttonContent = button:FindFirstChild("ButtonContent")
+			if buttonContent then
+				local statusLabel = buttonContent:FindFirstChild("StatusLabel")
+				if statusLabel then
 					if isTeleported then
 						statusLabel.Text = "Телепортирован - нажмите Q для возврата"
 					else
@@ -334,17 +333,13 @@ end)
 
 -- Функция для обработки смены команды
 local function onTeamChanged()
-	-- Небольшая задержка для надежности
-	wait(0.1)
 	updatePlayerList()
 end
 
 -- Подписываемся на событие смены команды у всех игроков
 local function setupTeamTracking()
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
-		otherPlayer:GetPropertyChangedSignal("Team"):Connect(function()
-			onTeamChanged()
-		end)
+		otherPlayer:GetPropertyChangedSignal("Team"):Connect(onTeamChanged)
 	end
 end
 
@@ -352,7 +347,7 @@ end
 setupTeamTracking()
 updatePlayerList()
 
--- Постоянное обновление через RunService (с защитой от частых обновлений)
+-- Постоянное обновление через RunService
 RunService.Heartbeat:Connect(function()
 	lastUpdate = lastUpdate + 1/60
 	if lastUpdate >= updateInterval then
@@ -371,7 +366,16 @@ end)
 
 Players.PlayerRemoving:Connect(function(leavingPlayer)
 	-- Если игрок выходит, сразу обновляем список
-	updatePlayerList()
+	if activeButtons[leavingPlayer.UserId] then
+		activeButtons[leavingPlayer.UserId]:Destroy()
+		activeButtons[leavingPlayer.UserId] = nil
+		
+		if selectedSheriff and selectedSheriff.UserId == leavingPlayer.UserId then
+			selectedSheriff = nil
+			isTeleported = false
+			savedPosition = nil
+		end
+	end
 end)
 
 -- Обработчик изменения команды у локального игрока
