@@ -49,9 +49,10 @@ local uiListLayout = Instance.new("UIListLayout")
 uiListLayout.Padding = UDim.new(0, 5)
 uiListLayout.Parent = contentFrame
 
--- Полностью переработанная система управления кнопками
-local currentSheriffButtons = {} -- Только текущие кнопки
-local selectedSheriff = nil
+-- Таблицы для управления кнопками и игроками
+local currentSheriffButtons = {} -- [UserId] = button
+local currentSheriffs = {} -- [UserId] = player
+local selectedSheriffUserId = nil -- Храним ID выбранного игрока
 local savedPosition = nil
 local isTeleported = false
 local isUIVisible = true
@@ -86,7 +87,12 @@ end
 
 -- Функция для телепортации к выбранному шерифу
 local function teleportToSheriff()
-	if not selectedSheriff then
+	if not selectedSheriffUserId then
+		return
+	end
+
+	local sheriff = currentSheriffs[selectedSheriffUserId]
+	if not sheriff then
 		return
 	end
 
@@ -94,14 +100,14 @@ local function teleportToSheriff()
 		return
 	end
 
-	if not selectedSheriff.Character or not selectedSheriff.Character:FindFirstChild("HumanoidRootPart") then
+	if not sheriff.Character or not sheriff.Character:FindFirstChild("HumanoidRootPart") then
 		return
 	end
 
 	if not isTeleported then
 		-- Телепортация к шерифу
 		savedPosition = player.Character.HumanoidRootPart.CFrame
-		local targetPosition = getPositionBehind(selectedSheriff.Character, 4)
+		local targetPosition = getPositionBehind(sheriff.Character, 4)
 		if targetPosition then
 			player.Character.HumanoidRootPart.CFrame = targetPosition
 			isTeleported = true
@@ -114,19 +120,34 @@ local function teleportToSheriff()
 			savedPosition = nil
 		end
 	end
+	
+	-- Обновляем статус кнопки
+	updateButtonStatus(selectedSheriffUserId)
 end
 
--- Функция для полной очистки всех кнопок
-local function clearAllButtons()
-	-- Удаляем все кнопки из контентного фрейма
-	for _, child in ipairs(contentFrame:GetChildren()) do
-		if child:IsA("TextButton") then
-			child:Destroy()
-		end
-	end
+-- Функция для обновления статуса кнопки
+local function updateButtonStatus(userId)
+	local button = currentSheriffButtons[userId]
+	if not button then return end
 	
-	-- Очищаем таблицу кнопок
-	currentSheriffButtons = {}
+	local buttonContent = button:FindFirstChild("ButtonContent")
+	if not buttonContent then return end
+	
+	local statusLabel = buttonContent:FindFirstChild("StatusLabel")
+	if not statusLabel then return end
+	
+	if selectedSheriffUserId == userId then
+		if isTeleported then
+			statusLabel.Text = "Телепортирован - нажмите Q для возврата"
+			button.BackgroundColor3 = Color3.fromRGB(120, 80, 80)
+		else
+			statusLabel.Text = "Выбран - нажмите Q для телепортации"
+			button.BackgroundColor3 = Color3.fromRGB(80, 120, 80)
+		end
+	else
+		statusLabel.Text = "Выберите для телепортации"
+		button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	end
 end
 
 -- Функция для создания кнопки игрока с аватаром
@@ -193,35 +214,21 @@ local function createPlayerButton(sheriff)
 	statusLabel.Parent = buttonContent
 
 	button.MouseButton1Click:Connect(function()
-		-- Снимаем выделение с предыдущего шерифа
-		for _, btn in pairs(currentSheriffButtons) do
-			if btn ~= button then
-				btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-				local btnContent = btn:FindFirstChild("ButtonContent")
-				if btnContent then
-					local lbl = btnContent:FindFirstChild("StatusLabel")
-					if lbl then
-						lbl.Text = "Выберите для телепортации"
-					end
-				end
-			end
-		end
-
-		-- Выделяем текущего шерифа
-		if selectedSheriff == sheriff then
-			-- Снимаем выделение при повторном нажатии
-			selectedSheriff = nil
-			button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-			statusLabel.Text = "Выберите для телепортации"
+		-- Если уже выбран этот же игрок, снимаем выделение
+		if selectedSheriffUserId == sheriff.UserId then
+			selectedSheriffUserId = nil
 			isTeleported = false
 			savedPosition = nil
+			updateButtonStatus(sheriff.UserId)
 		else
+			-- Снимаем выделение с предыдущего шерифа
+			if selectedSheriffUserId then
+				updateButtonStatus(selectedSheriffUserId)
+			end
+			
 			-- Выделяем нового шерифа
-			selectedSheriff = sheriff
-			button.BackgroundColor3 = Color3.fromRGB(80, 120, 80)
-			statusLabel.Text = "Выбран - нажмите Q для телепортации"
-			isTeleported = false
-			savedPosition = nil
+			selectedSheriffUserId = sheriff.UserId
+			updateButtonStatus(selectedSheriffUserId)
 		end
 	end)
 
@@ -245,45 +252,63 @@ local function toggleUI()
 	end
 end
 
--- Полностью переработанная функция обновления списка игроков
+-- Функция для удаления кнопки игрока
+local function removePlayerButton(userId)
+	local button = currentSheriffButtons[userId]
+	if button then
+		button:Destroy()
+		currentSheriffButtons[userId] = nil
+	end
+	
+	-- Если удаленный игрок был выбранным шерифом
+	if selectedSheriffUserId == userId then
+		selectedSheriffUserId = nil
+		isTeleported = false
+		savedPosition = nil
+	end
+end
+
+-- Функция обновления списка игроков
 local function updatePlayerList()
 	-- Получаем текущих шерифов
-	local currentSheriffs = {}
+	local newSheriffs = {}
+	local newSheriffIds = {}
 	
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
 		if otherPlayer.Team and otherPlayer.Team.Name:lower() == "sheriffs" and otherPlayer ~= player then
-			table.insert(currentSheriffs, otherPlayer)
+			newSheriffs[otherPlayer.UserId] = otherPlayer
+			newSheriffIds[otherPlayer.UserId] = true
 		end
 	end
 	
-	-- Полностью очищаем старые кнопки
-	clearAllButtons()
-	
-	-- Создаем новые кнопки для текущих шерифов
-	for _, sheriff in ipairs(currentSheriffs) do
-		local button = createPlayerButton(sheriff)
-		table.insert(currentSheriffButtons, button)
+	-- Удаляем кнопки игроков, которые больше не шерифы
+	for userId, _ in pairs(currentSheriffs) do
+		if not newSheriffIds[userId] then
+			removePlayerButton(userId)
+		end
 	end
 	
-	-- Проверяем, остался ли выбранный шериф в списке
-	if selectedSheriff then
-		local sheriffStillExists = false
-		for _, sheriff in ipairs(currentSheriffs) do
-			if sheriff == selectedSheriff then
-				sheriffStillExists = true
-				break
-			end
+	-- Добавляем кнопки для новых шерифов
+	for userId, sheriff in pairs(newSheriffs) do
+		if not currentSheriffButtons[userId] then
+			currentSheriffButtons[userId] = createPlayerButton(sheriff)
 		end
-		
-		if not sheriffStillExists then
-			selectedSheriff = nil
-			isTeleported = false
-			savedPosition = nil
-		end
+	end
+	
+	-- Обновляем таблицу текущих шерифов
+	currentSheriffs = newSheriffs
+	
+	-- Обновляем статус всех кнопок
+	for userId, _ in pairs(currentSheriffButtons) do
+		updateButtonStatus(userId)
 	end
 	
 	-- Обновляем заголовок с количеством шерифов
-	title.Text = "ШЕРИФЫ (" .. #currentSheriffs .. ")"
+	local sheriffCount = 0
+	for _ in pairs(currentSheriffs) do
+		sheriffCount = sheriffCount + 1
+	end
+	title.Text = "ШЕРИФЫ (" .. sheriffCount .. ")"
 end
 
 -- Обработчик нажатия клавиши Q для телепортации
@@ -292,27 +317,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
 	if input.KeyCode == Enum.KeyCode.Q then
 		teleportToSheriff()
-
-		-- Обновляем статус всех кнопок
-		for _, button in pairs(currentSheriffButtons) do
-			local buttonContent = button:FindFirstChild("ButtonContent")
-			if buttonContent then
-				local statusLabel = buttonContent:FindFirstChild("StatusLabel")
-				local nameLabel = buttonContent:FindFirstChild("NameLabel")
-				
-				if statusLabel and nameLabel then
-					if selectedSheriff and nameLabel.Text == selectedSheriff.Name then
-						if isTeleported then
-							statusLabel.Text = "Телепортирован - нажмите Q для возврата"
-						else
-							statusLabel.Text = "Выбран - нажмите Q для телепортации"
-						end
-					else
-						statusLabel.Text = "Выберите для телепортации"
-					end
-				end
-			end
-		end
 	end
 end)
 
@@ -341,18 +345,6 @@ end
 setupTeamTracking()
 updatePlayerList()
 
--- Постоянное обновление через RunService (каждые 2 секунды для надежности)
-local lastUpdate = 0
-local updateInterval = 2
-
-RunService.Heartbeat:Connect(function(deltaTime)
-	lastUpdate = lastUpdate + deltaTime
-	if lastUpdate >= updateInterval then
-		updatePlayerList()
-		lastUpdate = 0
-	end
-end)
-
 -- Обработчики для новых игроков
 Players.PlayerAdded:Connect(function(newPlayer)
 	newPlayer:GetPropertyChangedSignal("Team"):Connect(function()
@@ -362,13 +354,8 @@ Players.PlayerAdded:Connect(function(newPlayer)
 end)
 
 Players.PlayerRemoving:Connect(function(leavingPlayer)
-	-- Если выходящий игрок был выбранным шерифом
-	if selectedSheriff and selectedSheriff == leavingPlayer then
-		selectedSheriff = nil
-		isTeleported = false
-		savedPosition = nil
-	end
-	updatePlayerList()
+	removePlayerButton(leavingPlayer.UserId)
+	currentSheriffs[leavingPlayer.UserId] = nil
 end)
 
 -- Обработчик изменения команды у локального игрока
