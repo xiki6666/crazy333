@@ -255,18 +255,17 @@ end
 local function updatePlayerList()
 	-- Получаем текущих шерифов
 	local currentSheriffs = {}
+	local currentSheriffIds = {}
 	
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
 		if otherPlayer.Team and otherPlayer.Team.Name:lower() == "sheriffs" and otherPlayer ~= player then
 			table.insert(currentSheriffs, otherPlayer)
+			currentSheriffIds[otherPlayer.UserId] = true
 		end
 	end
 	
-	-- Создаем таблицу для отслеживания ID текущих шерифов
-	local currentSheriffIds = {}
-	for _, sheriff in ipairs(currentSheriffs) do
-		currentSheriffIds[sheriff.UserId] = true
-	end
+	-- Создаем временную таблицу для отслеживания кнопок, которые нужно сохранить
+	local buttonsToKeep = {}
 	
 	-- Удаляем кнопки игроков, которые больше не шерифы
 	for userId, button in pairs(activeButtons) do
@@ -280,12 +279,14 @@ local function updatePlayerList()
 				isTeleported = false
 				savedPosition = nil
 			end
+		else
+			buttonsToKeep[userId] = true
 		end
 	end
 	
 	-- Добавляем кнопки для новых шерифов
 	for _, sheriff in ipairs(currentSheriffs) do
-		if not activeButtons[sheriff.UserId] then
+		if not buttonsToKeep[sheriff.UserId] and not activeButtons[sheriff.UserId] then
 			activeButtons[sheriff.UserId] = createPlayerButton(sheriff)
 		end
 	end
@@ -344,15 +345,18 @@ end
 setupTeamTracking()
 updatePlayerList()
 
--- Постоянное обновление через RunService (с защитой от частых обновлений)
-local isUpdating = false
+-- Постоянное обновление через RunService
+local needsUpdate = false
 RunService.Heartbeat:Connect(function()
 	lastUpdate = lastUpdate + 1/60
-	if lastUpdate >= updateInterval and not isUpdating then
-		isUpdating = true
-		updatePlayerList()
+	if lastUpdate >= updateInterval then
+		needsUpdate = true
 		lastUpdate = 0
-		isUpdating = false
+	end
+	
+	if needsUpdate then
+		updatePlayerList()
+		needsUpdate = false
 	end
 end)
 
@@ -361,7 +365,7 @@ Players.PlayerAdded:Connect(function(newPlayer)
 	newPlayer:GetPropertyChangedSignal("Team"):Connect(function()
 		onTeamChanged()
 	end)
-	updatePlayerList()
+	needsUpdate = true
 end)
 
 Players.PlayerRemoving:Connect(function(leavingPlayer)
