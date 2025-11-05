@@ -345,6 +345,18 @@ end
 setupTeamTracking()
 updatePlayerList()
 
+-- Добавляем периодическое обновление через RunService (каждые 2 секунды)
+local lastUpdate = 0
+local updateInterval = 2
+
+RunService.Heartbeat:Connect(function(deltaTime)
+	lastUpdate = lastUpdate + deltaTime
+	if lastUpdate >= updateInterval then
+		updatePlayerList()
+		lastUpdate = 0
+	end
+end)
+
 -- Обработчики для новых игроков
 Players.PlayerAdded:Connect(function(newPlayer)
 	newPlayer:GetPropertyChangedSignal("Team"):Connect(function()
