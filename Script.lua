@@ -13,7 +13,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 400) -- Увеличили ширину для аватаров
+frame.Size = UDim2.new(0, 300, 0, 400)
 frame.Position = UDim2.new(0, 10, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 frame.BorderSizePixel = 0
@@ -126,7 +126,7 @@ end
 -- Функция для создания кнопки игрока с аватаром
 local function createPlayerButton(sheriff)
 	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, 0, 0, 60) -- Увеличили высоту для аватара
+	button.Size = UDim2.new(1, 0, 0, 60)
 	button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 	button.Text = ""
 	button.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -235,39 +235,52 @@ local function toggleUI()
 	end
 end
 
+-- Функция полной очистки списка игроков
+local function clearPlayerList()
+	-- Удаляем все кнопки
+	for userId, button in pairs(activeButtons) do
+		button:Destroy()
+	end
+	activeButtons = {}
+	
+	-- Сбрасываем выбранного шерифа
+	selectedSheriff = nil
+	isTeleported = false
+	savedPosition = nil
+end
+
 -- Функция обновления списка игроков
 local function updatePlayerList()
 	local sheriffs = {}
+	local currentSheriffIds = {}
 
 	-- Ищем всех игроков в команде Sheriffs
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
 		if otherPlayer.Team and otherPlayer.Team.Name:lower() == "sheriffs" and otherPlayer ~= player then
 			table.insert(sheriffs, otherPlayer)
+			currentSheriffIds[otherPlayer.UserId] = true
 		end
 	end
 
 	-- Удаляем кнопки игроков, которые больше не шерифы или вышли
+	local toRemove = {}
 	for userId, button in pairs(activeButtons) do
-		local sheriffPlayer = Players:GetPlayerByUserId(userId)
-		local shouldRemove = true
+		if not currentSheriffIds[userId] then
+			table.insert(toRemove, userId)
+		end
+	end
 
-		for _, sheriff in ipairs(sheriffs) do
-			if sheriff.UserId == userId then
-				shouldRemove = false
-				break
-			end
+	for _, userId in ipairs(toRemove) do
+		if activeButtons[userId] then
+			activeButtons[userId]:Destroy()
+			activeButtons[userId] = nil
 		end
 
-		if shouldRemove then
-			button:Destroy()
-			activeButtons[userId] = nil
-
-			-- Если удаленный игрок был выбранным шерифом
-			if selectedSheriff and selectedSheriff.UserId == userId then
-				selectedSheriff = nil
-				isTeleported = false
-				savedPosition = nil
-			end
+		-- Если удаленный игрок был выбранным шерифом
+		if selectedSheriff and selectedSheriff.UserId == userId then
+			selectedSheriff = nil
+			isTeleported = false
+			savedPosition = nil
 		end
 	end
 
@@ -275,16 +288,6 @@ local function updatePlayerList()
 	for _, sheriff in ipairs(sheriffs) do
 		if not activeButtons[sheriff.UserId] then
 			activeButtons[sheriff.UserId] = createPlayerButton(sheriff)
-		else
-			-- Обновляем аватар существующей кнопки (на случай изменения)
-			local button = activeButtons[sheriff.UserId]
-			local contentFrame = button:FindFirstChildOfClass("Frame")
-			if contentFrame then
-				local avatar = contentFrame:FindFirstChildOfClass("ImageLabel")
-				if avatar then
-					avatar.Image = getPlayerAvatar(sheriff.UserId)
-				end
-			end
 		end
 	end
 
@@ -329,26 +332,19 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
--- Обработчики событий для мгновенного обновления
-Players.PlayerAdded:Connect(function()
-	updatePlayerList()
-end)
-
-Players.PlayerRemoving:Connect(function()
-	updatePlayerList()
-end)
-
 -- Функция для обработки смены команды
 local function onTeamChanged()
+	-- Небольшая задержка для надежности
+	wait(0.1)
 	updatePlayerList()
 end
 
 -- Подписываемся на событие смены команды у всех игроков
 local function setupTeamTracking()
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
-		if otherPlayer:FindFirstChild("Team") then
-			otherPlayer.TeamChanged:Connect(onTeamChanged)
-		end
+		otherPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+			onTeamChanged()
+		end)
 	end
 end
 
@@ -356,7 +352,7 @@ end
 setupTeamTracking()
 updatePlayerList()
 
--- Постоянное обновление через RunService
+-- Постоянное обновление через RunService (с защитой от частых обновлений)
 RunService.Heartbeat:Connect(function()
 	lastUpdate = lastUpdate + 1/60
 	if lastUpdate >= updateInterval then
@@ -365,17 +361,27 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
--- Также обновляем при появлении новых игроков
+-- Обработчики для новых игроков
 Players.PlayerAdded:Connect(function(newPlayer)
-	if newPlayer:FindFirstChild("Team") then
-		newPlayer.TeamChanged:Connect(onTeamChanged)
-	end
+	newPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+		onTeamChanged()
+	end)
 	updatePlayerList()
+end)
+
+Players.PlayerRemoving:Connect(function(leavingPlayer)
+	-- Если игрок выходит, сразу обновляем список
+	updatePlayerList()
+end)
+
+-- Обработчик изменения команды у локального игрока
+player:GetPropertyChangedSignal("Team"):Connect(function()
+	onTeamChanged()
 end)
 
 -- Добавляем инструкцию
 local instruction = Instance.new("TextLabel")
-instruction.Size = UDim2.new(1, 0, 0, 50) -- Увеличили высоту для новой информации
+instruction.Size = UDim2.new(1, 0, 0, 50)
 instruction.Position = UDim2.new(0, 0, 1, 5)
 instruction.BackgroundTransparency = 1
 instruction.TextColor3 = Color3.fromRGB(200, 200, 200)
