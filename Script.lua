@@ -1,18 +1,19 @@
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ContentProvider = game:GetService("ContentProvider")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- Создаем основной интерфейс
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "TeamTeleportGUI"
+screenGui.Name = "SheriffTeleportGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 450)
+frame.Size = UDim2.new(0, 300, 0, 400) -- Увеличили ширину для аватаров
 frame.Position = UDim2.new(0, 10, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 frame.BorderSizePixel = 0
@@ -22,46 +23,9 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 8)
 corner.Parent = frame
 
--- Переключатель команд
-local teamSwitchFrame = Instance.new("Frame")
-teamSwitchFrame.Size = UDim2.new(1, 0, 0, 40)
-teamSwitchFrame.Position = UDim2.new(0, 0, 0, 0)
-teamSwitchFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-teamSwitchFrame.BorderSizePixel = 0
-teamSwitchFrame.Parent = frame
-
-local teamSwitchCorner = Instance.new("UICorner")
-teamSwitchCorner.CornerRadius = UDim.new(0, 8)
-teamSwitchCorner.Parent = teamSwitchFrame
-
-local sheriffsButton = Instance.new("TextButton")
-sheriffsButton.Size = UDim2.new(0.5, -2, 1, 0)
-sheriffsButton.Position = UDim2.new(0, 0, 0, 0)
-sheriffsButton.BackgroundColor3 = Color3.fromRGB(80, 120, 80)
-sheriffsButton.Text = "SHERIFFS"
-sheriffsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-sheriffsButton.Font = Enum.Font.GothamBold
-sheriffsButton.TextSize = 14
-sheriffsButton.Parent = teamSwitchFrame
-
-local criminalsButton = Instance.new("TextButton")
-criminalsButton.Size = UDim2.new(0.5, -2, 1, 0)
-criminalsButton.Position = UDim2.new(0.5, 2, 0, 0)
-criminalsButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-criminalsButton.Text = "CRIMINALS"
-criminalsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-criminalsButton.Font = Enum.Font.GothamBold
-criminalsButton.TextSize = 14
-criminalsButton.Parent = teamSwitchFrame
-
-local buttonCorner = Instance.new("UICorner")
-buttonCorner.CornerRadius = UDim.new(0, 6)
-buttonCorner.Parent = sheriffsButton
-buttonCorner:Clone().Parent = criminalsButton
-
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
-title.Position = UDim2.new(0, 0, 0, 45)
+title.Position = UDim2.new(0, 0, 0, 0)
 title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Text = "ШЕРИФЫ"
@@ -74,85 +38,30 @@ titleCorner.CornerRadius = UDim.new(0, 8)
 titleCorner.Parent = title
 
 local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -10, 1, -140)
-scrollFrame.Position = UDim2.new(0, 5, 0, 80)
+scrollFrame.Size = UDim2.new(1, -10, 1, -40)
+scrollFrame.Position = UDim2.new(0, 5, 0, 35)
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
 scrollFrame.BorderSizePixel = 0
 scrollFrame.BackgroundTransparency = 1
-scrollFrame.ScrollBarThickness = 6
+scrollFrame.ScrollBarThickness = 4
 scrollFrame.Parent = frame
 
 local uiListLayout = Instance.new("UIListLayout")
 uiListLayout.Padding = UDim.new(0, 5)
 uiListLayout.Parent = scrollFrame
 
--- Переменные для управления
-local activeButtons = {} -- Отслеживание активных кнопок
-local currentTeam = "Sheriffs" -- Текущая выбранная команда
+local activeButtons = {}
+local lastUpdate = 0
+local updateInterval = 1
 
 -- Переменные для системы телепортации
-local selectedPlayer = nil
+local selectedSheriff = nil
 local savedPosition = nil
 local isTeleported = false
 
 -- Переменная для отслеживания видимости интерфейса
 local isUIVisible = true
-
--- Кнопка обновления списка
-local refreshButton = Instance.new("TextButton")
-refreshButton.Size = UDim2.new(1, -10, 0, 35)
-refreshButton.Position = UDim2.new(0, 5, 1, -90)
-refreshButton.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
-refreshButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-refreshButton.Text = "ОБНОВИТЬ СПИСОК"
-refreshButton.Font = Enum.Font.GothamBold
-refreshButton.TextSize = 14
-refreshButton.Parent = frame
-
-local refreshCorner = Instance.new("UICorner")
-refreshCorner.CornerRadius = UDim.new(0, 6)
-refreshCorner.Parent = refreshButton
-
--- Инструкция
-local instruction = Instance.new("TextLabel")
-instruction.Size = UDim2.new(1, -10, 0, 40)
-instruction.Position = UDim2.new(0, 5, 1, -45)
-instruction.BackgroundTransparency = 1
-instruction.TextColor3 = Color3.fromRGB(200, 200, 200)
-instruction.Text = "Выберите игрока и нажмите Q для телепортации\nH - скрыть/показать интерфейс"
-instruction.Font = Enum.Font.Gotham
-instruction.TextSize = 12
-instruction.TextWrapped = true
-instruction.Parent = frame
-
--- Функция для скрытия/показа интерфейса
-local function toggleUI()
-	isUIVisible = not isUIVisible
-	frame.Visible = isUIVisible
-end
-
--- Функция для загрузки аватара игрока
-local function loadPlayerAvatar(targetPlayer, imageLabel)
-	-- Не загружаем аватар для локального игрока
-	if targetPlayer == player then
-		imageLabel.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
-		return
-	end
-
-	local success, result = pcall(function()
-		local thumbnailType = Enum.ThumbnailType.AvatarThumbnail
-		local thumbnailSize = Enum.ThumbnailSize.Size100x100
-		local content, isReady = Players:GetUserThumbnailAsync(targetPlayer.UserId, thumbnailType, thumbnailSize)
-		return content
-	end)
-
-	if success then
-		imageLabel.Image = result
-	else
-		imageLabel.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
-	end
-end
 
 -- Функция для расчета позиции за спиной игрока
 local function getPositionBehind(targetCharacter, distance)
@@ -166,9 +75,25 @@ local function getPositionBehind(targetCharacter, distance)
 	return rootPart.CFrame - lookVector * distance
 end
 
--- Функция для телепортации к выбранному игроку
-local function teleportToPlayer()
-	if not selectedPlayer then
+-- Функция для получения аватара игрока
+local function getPlayerAvatar(userId)
+	local thumbnailType = Enum.ThumbnailType.HeadShot
+	local thumbnailSize = Enum.ThumbnailSize.Size100x100
+	
+	local success, result = pcall(function()
+		return Players:GetUserThumbnailAsync(userId, thumbnailType, thumbnailSize)
+	end)
+	
+	if success then
+		return result
+	else
+		return "rbxasset://textures/ui/GuiImagePlaceholder.png"
+	end
+end
+
+-- Функция для телепортации к выбранному шерифу
+local function teleportToSheriff()
+	if not selectedSheriff then
 		return
 	end
 
@@ -176,18 +101,20 @@ local function teleportToPlayer()
 		return
 	end
 
-	if not selectedPlayer.Character or not selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
+	if not selectedSheriff.Character or not selectedSheriff.Character:FindFirstChild("HumanoidRootPart") then
 		return
 	end
 
 	if not isTeleported then
+		-- Телепортация к шерифу
 		savedPosition = player.Character.HumanoidRootPart.CFrame
-		local targetPosition = getPositionBehind(selectedPlayer.Character, 4)
+		local targetPosition = getPositionBehind(selectedSheriff.Character, 4)
 		if targetPosition then
 			player.Character.HumanoidRootPart.CFrame = targetPosition
 			isTeleported = true
 		end
 	else
+		-- Возврат на исходную позицию
 		if savedPosition then
 			player.Character.HumanoidRootPart.CFrame = savedPosition
 			isTeleported = false
@@ -196,12 +123,15 @@ local function teleportToPlayer()
 	end
 end
 
--- Функция для создания кнопки игрока
-local function createPlayerButton(targetPlayer)
+-- Функция для создания кнопки игрока с аватаром
+local function createPlayerButton(sheriff)
 	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, 0, 0, 60)
+	button.Size = UDim2.new(1, 0, 0, 60) -- Увеличили высоту для аватара
 	button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 	button.Text = ""
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.Font = Enum.Font.Gotham
+	button.TextSize = 12
 	button.AutoButtonColor = true
 	button.Parent = scrollFrame
 
@@ -209,96 +139,76 @@ local function createPlayerButton(targetPlayer)
 	buttonCorner.CornerRadius = UDim.new(0, 6)
 	buttonCorner.Parent = button
 
+	-- Контейнер для содержимого кнопки
+	local contentFrame = Instance.new("Frame")
+	contentFrame.Size = UDim2.new(1, 0, 1, 0)
+	contentFrame.BackgroundTransparency = 1
+	contentFrame.Parent = button
+
 	-- Аватар игрока
-	local avatarFrame = Instance.new("Frame")
-	avatarFrame.Size = UDim2.new(0, 50, 0, 50)
-	avatarFrame.Position = UDim2.new(0, 5, 0, 5)
-	avatarFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	avatarFrame.Parent = button
+	local avatar = Instance.new("ImageLabel")
+	avatar.Size = UDim2.new(0, 40, 0, 40)
+	avatar.Position = UDim2.new(0, 10, 0.5, -20)
+	avatar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	avatar.BorderSizePixel = 0
+	avatar.Image = getPlayerAvatar(sheriff.UserId)
+	avatar.Parent = contentFrame
 
 	local avatarCorner = Instance.new("UICorner")
-	avatarCorner.CornerRadius = UDim.new(0, 6)
-	avatarCorner.Parent = avatarFrame
+	avatarCorner.CornerRadius = UDim.new(0, 20)
+	avatarCorner.Parent = avatar
 
-	local avatarImage = Instance.new("ImageLabel")
-	avatarImage.Size = UDim2.new(1, 0, 1, 0)
-	avatarImage.BackgroundTransparency = 1
-	avatarImage.Parent = avatarFrame
-
-	local avatarCornerInner = Instance.new("UICorner")
-	avatarCornerInner.CornerRadius = UDim.new(0, 6)
-	avatarCornerInner.Parent = avatarImage
-
-	-- Загружаем аватар игрока
-	loadPlayerAvatar(targetPlayer, avatarImage)
-
-	-- Информация об игроке
-	local infoFrame = Instance.new("Frame")
-	infoFrame.Size = UDim2.new(1, -65, 1, 0)
-	infoFrame.Position = UDim2.new(0, 60, 0, 0)
-	infoFrame.BackgroundTransparency = 1
-	infoFrame.Name = "InfoFrame"
-	infoFrame.Parent = button
-
+	-- Имя игрока
 	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.new(1, 0, 0, 25)
-	nameLabel.Position = UDim2.new(0, 0, 0, 5)
+	nameLabel.Size = UDim2.new(1, -60, 0, 20)
+	nameLabel.Position = UDim2.new(0, 60, 0, 10)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-	nameLabel.Text = targetPlayer.Name
+	nameLabel.Text = sheriff.Name
 	nameLabel.Font = Enum.Font.GothamBold
 	nameLabel.TextSize = 12
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.Parent = infoFrame
+	nameLabel.Parent = contentFrame
 
+	-- Статус
 	local statusLabel = Instance.new("TextLabel")
-	statusLabel.Size = UDim2.new(1, 0, 0, 20)
-	statusLabel.Position = UDim2.new(0, 0, 0, 30)
+	statusLabel.Size = UDim2.new(1, -60, 0, 15)
+	statusLabel.Position = UDim2.new(0, 60, 0, 35)
 	statusLabel.BackgroundTransparency = 1
 	statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	statusLabel.Text = "Выберите для телепортации"
 	statusLabel.Font = Enum.Font.Gotham
 	statusLabel.TextSize = 10
 	statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-	statusLabel.Name = "StatusLabel"
-	statusLabel.Parent = infoFrame
-
-	-- Индикатор онлайн статуса
-	local onlineIndicator = Instance.new("Frame")
-	onlineIndicator.Size = UDim2.new(0, 8, 0, 8)
-	onlineIndicator.Position = UDim2.new(1, -15, 0, 10)
-	onlineIndicator.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-	onlineIndicator.Parent = infoFrame
-
-	local onlineCorner = Instance.new("UICorner")
-	onlineCorner.CornerRadius = UDim.new(1, 0)
-	onlineCorner.Parent = onlineIndicator
+	statusLabel.Parent = contentFrame
 
 	button.MouseButton1Click:Connect(function()
-		-- Снимаем выделение с предыдущего игрока
+		-- Снимаем выделение с предыдущего шерифа
 		for userId, btn in pairs(activeButtons) do
-			if userId ~= targetPlayer.UserId then
+			if userId ~= sheriff.UserId then
 				btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-				local btnInfoFrame = btn:FindFirstChild("InfoFrame")
-				if btnInfoFrame then
-					local btnStatusLabel = btnInfoFrame:FindFirstChild("StatusLabel")
-					if btnStatusLabel then
-						btnStatusLabel.Text = "Выберите для телепортации"
+				local content = btn:FindFirstChildOfClass("Frame")
+				if content then
+					local lbl = content:FindFirstChild("TextLabel")
+					if lbl and lbl.Name == "TextLabel" and lbl ~= nameLabel then
+						lbl.Text = "Выберите для телепортации"
 					end
 				end
 			end
 		end
 
-		-- Выделяем текущего игрока
-		if selectedPlayer == targetPlayer then
-			selectedPlayer = nil
+		-- Выделяем текущего шерифа
+		if selectedSheriff == sheriff then
+			-- Снимаем выделение при повторном нажатии
+			selectedSheriff = nil
 			button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 			statusLabel.Text = "Выберите для телепортации"
 			isTeleported = false
 			savedPosition = nil
 		else
-			selectedPlayer = targetPlayer
-			button.BackgroundColor3 = currentTeam == "Sheriffs" and Color3.fromRGB(80, 120, 80) or Color3.fromRGB(120, 80, 80)
+			-- Выделяем нового шерифа
+			selectedSheriff = sheriff
+			button.BackgroundColor3 = Color3.fromRGB(80, 120, 80)
 			statusLabel.Text = "Выбран - нажмите Q для телепортации"
 			isTeleported = false
 			savedPosition = nil
@@ -308,100 +218,101 @@ local function createPlayerButton(targetPlayer)
 	return button
 end
 
--- Функция очистки всех кнопок
-local function clearAllButtons()
-	for userId, button in pairs(activeButtons) do
-		if button and button.Parent then
-			button:Destroy()
-		end
+-- Функция для скрытия/показа интерфейса
+local function toggleUI()
+	isUIVisible = not isUIVisible
+	
+	local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	
+	if isUIVisible then
+		-- Показываем интерфейс
+		local tween = TweenService:Create(frame, tweenInfo, {Position = UDim2.new(0, 10, 0, 10)})
+		tween:Play()
+	else
+		-- Скрываем интерфейс (сдвигаем за левый край)
+		local tween = TweenService:Create(frame, tweenInfo, {Position = UDim2.new(0, -frame.Size.X.Offset - 10, 0, 10)})
+		tween:Play()
 	end
-	activeButtons = {}
 end
 
 -- Функция обновления списка игроков
 local function updatePlayerList()
-	-- Очищаем текущие кнопки
-	clearAllButtons()
+	local sheriffs = {}
 
-	local targetPlayers = {}
-
-	-- Ищем всех игроков в выбранной команде
+	-- Ищем всех игроков в команде Sheriffs
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
-		if otherPlayer.Team and otherPlayer.Team.Name:lower() == currentTeam:lower() and otherPlayer ~= player then
-			table.insert(targetPlayers, otherPlayer)
+		if otherPlayer.Team and otherPlayer.Team.Name:lower() == "sheriffs" and otherPlayer ~= player then
+			table.insert(sheriffs, otherPlayer)
 		end
 	end
 
-	-- Создаем кнопки для игроков в команде
-	for _, targetPlayer in ipairs(targetPlayers) do
-		activeButtons[targetPlayer.UserId] = createPlayerButton(targetPlayer)
+	-- Удаляем кнопки игроков, которые больше не шерифы или вышли
+	for userId, button in pairs(activeButtons) do
+		local sheriffPlayer = Players:GetPlayerByUserId(userId)
+		local shouldRemove = true
+
+		for _, sheriff in ipairs(sheriffs) do
+			if sheriff.UserId == userId then
+				shouldRemove = false
+				break
+			end
+		end
+
+		if shouldRemove then
+			button:Destroy()
+			activeButtons[userId] = nil
+
+			-- Если удаленный игрок был выбранным шерифом
+			if selectedSheriff and selectedSheriff.UserId == userId then
+				selectedSheriff = nil
+				isTeleported = false
+				savedPosition = nil
+			end
+		end
+	end
+
+	-- Создаем кнопки для новых шерифов
+	for _, sheriff in ipairs(sheriffs) do
+		if not activeButtons[sheriff.UserId] then
+			activeButtons[sheriff.UserId] = createPlayerButton(sheriff)
+		else
+			-- Обновляем аватар существующей кнопки (на случай изменения)
+			local button = activeButtons[sheriff.UserId]
+			local contentFrame = button:FindFirstChildOfClass("Frame")
+			if contentFrame then
+				local avatar = contentFrame:FindFirstChildOfClass("ImageLabel")
+				if avatar then
+					avatar.Image = getPlayerAvatar(sheriff.UserId)
+				end
+			end
+		end
 	end
 
 	-- Обновляем размер контента
 	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y)
 
-	-- Обновляем заголовок с количеством игроков
-	title.Text = currentTeam:upper() .. " (" .. #targetPlayers .. ")"
-
-	-- Сбрасываем выбранного игрока при обновлении, если его больше нет в списке
-	if selectedPlayer and not activeButtons[selectedPlayer.UserId] then
-		selectedPlayer = nil
-		isTeleported = false
-		savedPosition = nil
-	end
+	-- Обновляем заголовок с количеством шерифов
+	title.Text = "ШЕРИФЫ (" .. #sheriffs .. ")"
 end
 
--- Функция переключения команды
-local function switchTeam(newTeam)
-	if currentTeam == newTeam then return end
-
-	currentTeam = newTeam
-
-	-- Обновляем цвета кнопок переключателя
-	if newTeam == "Sheriffs" then
-		sheriffsButton.BackgroundColor3 = Color3.fromRGB(80, 120, 80)
-		criminalsButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-	else
-		sheriffsButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-		criminalsButton.BackgroundColor3 = Color3.fromRGB(120, 80, 80)
-	end
-
-	-- Обновляем список игроков
-	updatePlayerList()
-end
-
--- Обработчики для кнопок переключателя команды
-sheriffsButton.MouseButton1Click:Connect(function()
-	switchTeam("Sheriffs")
-end)
-
-criminalsButton.MouseButton1Click:Connect(function()
-	switchTeam("Criminals")
-end)
-
--- Обработчик для кнопки обновления
-refreshButton.MouseButton1Click:Connect(function()
-	updatePlayerList()
-end)
-
--- Обработчик нажатия клавиши Q
+-- Обработчик нажатия клавиши Q для телепортации
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 
 	if input.KeyCode == Enum.KeyCode.Q then
-		teleportToPlayer()
+		teleportToSheriff()
 
 		-- Обновляем статус кнопки
-		if selectedPlayer and activeButtons[selectedPlayer.UserId] then
-			local button = activeButtons[selectedPlayer.UserId]
-			local infoFrame = button:FindFirstChild("InfoFrame")
-			if infoFrame then
-				local statusLabel = infoFrame:FindFirstChild("StatusLabel")
-				if statusLabel then
+		if selectedSheriff and activeButtons[selectedSheriff.UserId] then
+			local button = activeButtons[selectedSheriff.UserId]
+			local contentFrame = button:FindFirstChildOfClass("Frame")
+			if contentFrame then
+				local statusLabel = contentFrame:FindFirstChild("TextLabel")
+				if statusLabel and statusLabel.Name == "TextLabel" then
 					if isTeleported then
-						statusLabel.Text = "Телепортирован к игроку - Q для возврата"
+						statusLabel.Text = "Телепортирован - нажмите Q для возврата"
 					else
-						statusLabel.Text = "Выбран - Q для телепортации"
+						statusLabel.Text = "Выбран - нажмите Q для телепортации"
 					end
 				end
 			end
@@ -418,17 +329,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
--- Обработчики событий для обновления при добавлении/удалении игроков
-local function onPlayerAdded()
+-- Обработчики событий для мгновенного обновления
+Players.PlayerAdded:Connect(function()
 	updatePlayerList()
-end
+end)
 
-local function onPlayerRemoved()
+Players.PlayerRemoving:Connect(function()
 	updatePlayerList()
-end
-
-Players.PlayerAdded:Connect(onPlayerAdded)
-Players.PlayerRemoving:Connect(onPlayerRemoved)
+end)
 
 -- Функция для обработки смены команды
 local function onTeamChanged()
@@ -447,3 +355,32 @@ end
 -- Начальная настройка
 setupTeamTracking()
 updatePlayerList()
+
+-- Постоянное обновление через RunService
+RunService.Heartbeat:Connect(function()
+	lastUpdate = lastUpdate + 1/60
+	if lastUpdate >= updateInterval then
+		updatePlayerList()
+		lastUpdate = 0
+	end
+end)
+
+-- Также обновляем при появлении новых игроков
+Players.PlayerAdded:Connect(function(newPlayer)
+	if newPlayer:FindFirstChild("Team") then
+		newPlayer.TeamChanged:Connect(onTeamChanged)
+	end
+	updatePlayerList()
+end)
+
+-- Добавляем инструкцию
+local instruction = Instance.new("TextLabel")
+instruction.Size = UDim2.new(1, 0, 0, 50) -- Увеличили высоту для новой информации
+instruction.Position = UDim2.new(0, 0, 1, 5)
+instruction.BackgroundTransparency = 1
+instruction.TextColor3 = Color3.fromRGB(200, 200, 200)
+instruction.Text = "Q - телепортация/возврат\nH - скрыть/показать меню"
+instruction.Font = Enum.Font.Gotham
+instruction.TextSize = 11
+instruction.TextWrapped = true
+instruction.Parent = frame
