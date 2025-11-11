@@ -22,7 +22,7 @@ screenGui.Parent = PlayerGui
 screenGui.ResetOnSpawn = false -- Сохраняем GUI после смерти
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 350, 0, 530) -- Увеличили высоту для статуса
+mainFrame.Size = UDim2.new(0, 350, 0, 530)
 mainFrame.Position = UDim2.new(0, 10, 0, 10)
 mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 mainFrame.BackgroundTransparency = 0.1
@@ -53,7 +53,7 @@ titleLabel.Parent = titleBar
 
 -- Список игроков
 local playerList = Instance.new("ScrollingFrame")
-playerList.Size = UDim2.new(1, -10, 1, -150) -- Уменьшили высоту для статуса
+playerList.Size = UDim2.new(1, -10, 0, 395) -- Уменьшили высоту для статуса
 playerList.Position = UDim2.new(0, 5, 0, 45)
 playerList.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 playerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -64,10 +64,10 @@ local listLayout = Instance.new("UIListLayout")
 listLayout.Padding = UDim.new(0, 5)
 listLayout.Parent = playerList
 
--- Панель статуса выбранного игрока
+-- Панель статуса выбранного игрока (над кнопкой обновить)
 local statusBar = Instance.new("Frame")
 statusBar.Size = UDim2.new(1, -10, 0, 40)
-statusBar.Position = UDim2.new(0, 5, 0, 405)
+statusBar.Position = UDim2.new(0, 5, 0, 445) -- Позиция над кнопкой обновить
 statusBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 statusBar.Parent = mainFrame
 
