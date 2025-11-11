@@ -13,6 +13,7 @@ local connections = {}
 local selectedPlayerFrame = nil
 local selectedPlayer = nil
 local guiVisible = true
+local movementConnection = nil
 
 -- Создание GUI
 local screenGui = Instance.new("ScreenGui")
@@ -21,7 +22,7 @@ screenGui.Parent = PlayerGui
 screenGui.ResetOnSpawn = false -- Сохраняем GUI после смерти
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 350, 0, 500)
+mainFrame.Size = UDim2.new(0, 350, 0, 530) -- Увеличили высоту для статуса
 mainFrame.Position = UDim2.new(0, 10, 0, 10)
 mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 mainFrame.BackgroundTransparency = 0.1
@@ -52,7 +53,7 @@ titleLabel.Parent = titleBar
 
 -- Список игроков
 local playerList = Instance.new("ScrollingFrame")
-playerList.Size = UDim2.new(1, -10, 1, -100)
+playerList.Size = UDim2.new(1, -10, 1, -150) -- Уменьшили высоту для статуса
 playerList.Position = UDim2.new(0, 5, 0, 45)
 playerList.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 playerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -62,6 +63,27 @@ playerList.Parent = mainFrame
 local listLayout = Instance.new("UIListLayout")
 listLayout.Padding = UDim.new(0, 5)
 listLayout.Parent = playerList
+
+-- Панель статуса выбранного игрока
+local statusBar = Instance.new("Frame")
+statusBar.Size = UDim2.new(1, -10, 0, 40)
+statusBar.Position = UDim2.new(0, 5, 0, 405)
+statusBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+statusBar.Parent = mainFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusBar
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 1, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Выберите игрока для отображения статуса"
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 12
+statusLabel.TextWrapped = true
+statusLabel.Parent = statusBar
 
 -- Панель обновления
 local bottomBar = Instance.new("Frame")
@@ -117,6 +139,50 @@ local function getLeaderstatsString(player)
     end
 end
 
+-- Функция для отслеживания движения игрока
+local function trackPlayerMovement(player)
+    if movementConnection then
+        movementConnection:Disconnect()
+        movementConnection = nil
+    end
+    
+    movementConnection = RunService.Heartbeat:Connect(function()
+        if not player or not player.Parent or not selectedPlayer then
+            if movementConnection then
+                movementConnection:Disconnect()
+                movementConnection = nil
+            end
+            statusLabel.Text = "Игрок недоступен"
+            return
+        end
+        
+        local character = player.Character
+        if not character then
+            statusLabel.Text = "Персонаж не найден"
+            return
+        end
+        
+        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        if not humanoidRootPart then
+            statusLabel.Text = "Нет корневой части"
+            return
+        end
+        
+        -- Проверяем движение по скорости
+        local velocity = humanoidRootPart.Velocity
+        local speed = math.sqrt(velocity.X * velocity.X + velocity.Y * velocity.Y + velocity.Z * velocity.Z)
+        
+        -- Проверяем стоит ли игрок (скорость меньше 0.1)
+        if speed < 0.1 then
+            statusLabel.Text = "Статус: Стоит на месте"
+            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100) -- Зеленый
+        else
+            statusLabel.Text = "Статус: Двигается (скорость: " .. math.floor(speed * 10) / 10 .. ")"
+            statusLabel.TextColor3 = Color3.fromRGB(255, 150, 100) -- Оранжевый
+        end
+    end)
+end
+
 -- Функция для снятия выделения со всех игроков
 local function clearAllHighlights()
     for _, child in ipairs(playerList:GetChildren()) do
@@ -128,6 +194,15 @@ local function clearAllHighlights()
             end
         end
     end
+    
+    -- Останавливаем отслеживание движения
+    if movementConnection then
+        movementConnection:Disconnect()
+        movementConnection = nil
+    end
+    
+    statusLabel.Text = "Выберите игрока для отображения статуса"
+    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 end
 
 local function createPlayerEntry(player)
@@ -256,6 +331,9 @@ local function createPlayerEntry(player)
                 selectedPlayerFrame = frame
                 selectedPlayer = player
                 teleportingTo = player
+                
+                -- Начинаем отслеживать движение выбранного игрока
+                trackPlayerMovement(player)
             end
         end
     end)
@@ -289,9 +367,13 @@ local function updatePlayerList()
         end
         
         if not playerStillInTeam then
+            clearAllHighlights()
             selectedPlayerFrame = nil
             selectedPlayer = nil
             teleportingTo = nil
+        else
+            -- Продолжаем отслеживать движение, если игрок все еще выбран
+            trackPlayerMovement(selectedPlayer)
         end
     end
     
@@ -305,6 +387,7 @@ local function updatePlayerList()
         table.insert(connections, player.AncestryChanged:Connect(function()
             if not player.Parent then
                 if selectedPlayer == player then
+                    clearAllHighlights()
                     selectedPlayerFrame = nil
                     selectedPlayer = nil
                     teleportingTo = nil
